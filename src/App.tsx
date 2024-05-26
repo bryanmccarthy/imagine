@@ -9,6 +9,8 @@ type Image = {
   src: string
   x: number
   y: number
+  width: number
+  height: number
   dragging: boolean
   selected: boolean
   zIndex: number
@@ -21,6 +23,7 @@ function App() {
   const maxZIndex = useRef(1)
 
   const moveToFront = (id: string) => {
+    console.log('moveToFront')
     setImages((prevImages) => {
       const updatedImages = prevImages.map((image) => {
         if (image.id === id) {
@@ -33,34 +36,58 @@ function App() {
   }
 
   const onDrop = useCallback((acceptedFiles: any) => {
+    const file = acceptedFiles[0]
+
     const reader = new FileReader()
+    reader.readAsDataURL(file)
+
     reader.onload = () => {
+      const img = new Image()
+      img.src = reader.result as string
 
-      let initialX = 0
-      if (x.get() < 0) {
-        initialX = 0 + Math.abs(x.get())
-      } else if (x.get() > 0) {
-        initialX = 0 - x.get()
+      img.onload = () => {
+        console.log({
+          width: img.width,
+          height: img.height,
+          aspectRatio: img.width / img.height
+        })
+
+        let initialX = 0
+        if (x.get() < 0) {
+          initialX = 0 + Math.abs(x.get())
+        } else if (x.get() > 0) {
+          initialX = 0 - x.get()
+        }
+
+        let initialY = 0
+        if (y.get() < 0) {
+          initialY = 0 + Math.abs(y.get())
+        } else if (y.get() > 0) {
+          initialY = 0 - y.get()
+        }
+
+        setImages((prevImages: any) => [
+          ...prevImages,
+          {
+            id: uuidv4(), 
+            src: reader.result, 
+            x: initialX, 
+            y: initialY,
+            width: img.width,
+            height: img.height,
+            dragging: false, 
+            selected: false, 
+            zIndex: maxZIndex.current++
+          }
+        ])
       }
-
-      let initialY = 0
-      if (y.get() < 0) {
-        initialY = 0 + Math.abs(y.get())
-      } else if (y.get() > 0) {
-        initialY = 0 - y.get()
-      }
-
-      setImages((prevImages: any) => [
-        ...prevImages,
-        {id: uuidv4(), src: reader.result, x: initialX, y: initialY, dragging: false, selected: false, zIndex: maxZIndex.current++}
-      ])
     }
-    reader.readAsDataURL(acceptedFiles[0])
   }, [])
 
   const bind = useGesture(
     {
       onDrag: ({offset: [dx, dy]}) => {
+        // Prevent panning when an image is being dragged
         for (let i = 0; i < images.length; i++) {
           if (images[i].dragging) return
         }
@@ -144,16 +171,47 @@ function App() {
           }}
         >
         {images.map((image: Image) => 
-          <Image
+          <ImageComponent
             key={image.id} 
             image={image}
-            moveToFront={() => moveToFront(image.id)}
             onImageDrag={(x: number, y: number) => handleImageDrag(image.id, x, y)}
             onImageDragEnd={() => handleImageDragEnd(image.id)}
             onSelect={() => handleImageSelect(image.id)}
           />
         )}
+
+        {images.filter(image => image.selected).map((image) => (
+          <div key={image.id}>
+            <button
+              className="absolute flex justify-center items-center cursor-pointer -left-11 w-10 h-10 text-white rounded bg-indigo-500 bg-opacity-70"
+              style={{
+                left: `${image.x - 42}px`,
+                top: `${image.y}px`,
+                zIndex: 999,
+              }}
+              onClick={(e) => {
+                console.log('moveToFront')
+                e.stopPropagation()
+                moveToFront(image.id)
+              }}
+              >
+              <ArrowUpOnSquare />
+            </button>
+            <div
+              className="absolute border-2 border-indigo-500 opacity-60"
+              style={{
+              left: `${image.x}px`,
+              top: `${image.y}px`,
+              width: `${image.width}px`,
+              height: `${image.height}px`,
+              zIndex: 999,
+              pointerEvents: 'none',
+              }}
+            ></div>
+          </div>
+        ))}
         </animated.div>
+
       </div>
     </>
   )
@@ -161,13 +219,12 @@ function App() {
 
 type ImagePropsTypes = {
   image: Image
-  moveToFront: () => void
   onImageDrag: (x: number, y: number) => void
   onImageDragEnd: () => void
   onSelect: () => void
 }
 
-function Image({image, moveToFront, onImageDrag, onImageDragEnd, onSelect}: ImagePropsTypes) {
+function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect}: ImagePropsTypes) {
   const imagePos = useSpring({x: image.x, y: image.y})
 
   const handleImageClick = (e: any) => {
@@ -210,23 +267,11 @@ function Image({image, moveToFront, onImageDrag, onImageDragEnd, onSelect}: Imag
         <p>Selected: {image.selected ? 'true' : 'false'}</p>
         <p>ZIndex: {image.zIndex}</p>
       </div>
-
-      {image.selected &&
-        <button
-          className="absolute flex justify-center items-center cursor-pointer -left-11 w-10 h-10 text-white rounded bg-indigo-500 bg-opacity-70" 
-          onClick={moveToFront}
-        >
-          <ArrowUpOnSquare />
-        </button>
-      }
-      <div 
-        className={`${image.selected ? 'absolute top-0 left-0 w-full h-full border-2 border-indigo-500 opacity-60' : ''}`}
-      >
-      </div>
+      
       <img 
         src={image.src} 
         draggable={false} 
-        className="w-96 object-cover shadow-lg"
+        className="object-cover shadow-lg"
         alt="image"
       />
     </animated.div>
