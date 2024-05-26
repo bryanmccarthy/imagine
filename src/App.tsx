@@ -4,6 +4,8 @@ import {useGesture} from '@use-gesture/react'
 import {useSpring, animated} from '@react-spring/web'
 import { v4 as uuidv4 } from 'uuid'
 
+const showDebug = false
+
 type Image = {
   id: string
   src: string
@@ -14,6 +16,7 @@ type Image = {
   dragging: boolean
   selected: boolean
   zIndex: number
+  scale: number
 }
 
 function App() {
@@ -66,6 +69,14 @@ function App() {
           initialY = 0 - y.get()
         }
 
+        let initalScale = 1
+        if (img.width > 600) {
+          initalScale = 600 / img.width
+        }
+        if (img.height > 600) {
+          initalScale = 600 / img.height
+        }
+
         setImages((prevImages: any) => [
           ...prevImages,
           {
@@ -77,7 +88,8 @@ function App() {
             height: img.height,
             dragging: false, 
             selected: false, 
-            zIndex: maxZIndex.current++
+            zIndex: maxZIndex.current++,
+            scale: initalScale,
           }
         ])
       }
@@ -135,6 +147,18 @@ function App() {
     })
   }
 
+  const handleImageResize = (id: string, newWidth: number, newHeight: number) => {
+    setImages((prevImages: any) => {
+      const newImages = [...prevImages]
+      const index = newImages.findIndex(image => image.id === id)
+      if (index !== -1) {
+        const scale = newWidth / newImages[index].width
+        newImages[index] = { ...newImages[index], width: newWidth, height: newHeight, scale }
+      }
+      return newImages
+    })
+  }
+
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Backspace' || event.key === 'Delete') {
@@ -155,10 +179,12 @@ function App() {
         <input {...getInputProps()} />
 
         {/* debug */}
-        <div className="absolute z-10 top-0 left-0 p-4 text-white bg-black bg-opacity-50">
-          <p>MouseX: {mousePosition.x}, MouseY: {mousePosition.y}</p>
-          <p>PanX: {Math.floor(x.get())}, PanY:{Math.floor(y.get())}</p>
-        </div>
+        {showDebug && (
+          <div className="absolute z-10 top-0 left-0 p-4 text-white bg-black bg-opacity-50">
+            <p>MouseX: {mousePosition.x}, MouseY: {mousePosition.y}</p>
+            <p>PanX: {Math.floor(x.get())}, PanY:{Math.floor(y.get())}</p>
+          </div>
+        )}
         
         <animated.div
           style={{
@@ -168,6 +194,7 @@ function App() {
             height: '100%',
             position: 'relative',
             border: '2px dashed black',
+            userSelect: 'none',
           }}
         >
         {images.map((image: Image) => 
@@ -177,6 +204,7 @@ function App() {
             onImageDrag={(x: number, y: number) => handleImageDrag(image.id, x, y)}
             onImageDragEnd={() => handleImageDragEnd(image.id)}
             onSelect={() => handleImageSelect(image.id)}
+            onResize={(id: string, newWidth: number, newHeight: number) => handleImageResize(id, newWidth, newHeight)}
           />
         )}
 
@@ -187,7 +215,8 @@ function App() {
               style={{
                 left: `${image.x - 42}px`,
                 top: `${image.y}px`,
-                zIndex: 999,
+                zIndex: maxZIndex.current + 1,
+                userSelect: 'none',
               }}
               onClick={(e) => {
                 console.log('moveToFront')
@@ -198,14 +227,13 @@ function App() {
               <ArrowUpOnSquare />
             </button>
             <div
-              className="absolute border-2 border-indigo-500 opacity-60"
+              className="absolute border-2 border-indigo-500 opacity-60 pointer-events-none select-none"
               style={{
-              left: `${image.x}px`,
-              top: `${image.y}px`,
-              width: `${image.width}px`,
-              height: `${image.height}px`,
-              zIndex: 999,
-              pointerEvents: 'none',
+                left: `${image.x}px`,
+                top: `${image.y}px`,
+                width: `${image.width * image.scale}px`,
+                height: `${image.height * image.scale}px`,
+                zIndex: maxZIndex.current + 1,
               }}
             ></div>
           </div>
@@ -222,10 +250,12 @@ type ImagePropsTypes = {
   onImageDrag: (x: number, y: number) => void
   onImageDragEnd: () => void
   onSelect: () => void
+  onResize: (id: string, newWidth: number, newHeight: number) => void
 }
 
-function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect}: ImagePropsTypes) {
+function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}: ImagePropsTypes) {
   const imagePos = useSpring({x: image.x, y: image.y})
+  const [size, setSize] = useState({ width: image.width * image.scale, height: image.height * image.scale })
 
   const handleImageClick = (e: any) => {
     e.stopPropagation()
@@ -248,6 +278,24 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect}: ImagePro
     },
   )
 
+  const resizeBind = useGesture({
+    onDrag: ({ movement: [mx, my], memo, event }) => {
+      event.stopPropagation()
+      if (!memo) {
+        memo = { width: size.width, height: size.height }
+      }
+      const newWidth = Math.max(50, memo.width + mx)
+      const newHeight = Math.max(50, memo.height + my)
+      setSize({ width: newWidth, height: newHeight })
+      onResize(image.id, newWidth, newHeight)
+      return memo
+    },
+  })
+
+  const handleMouseDown = (e: any) => {
+    e.preventDefault()
+  }
+
   return (
     <animated.div 
       {...bind()} 
@@ -261,16 +309,33 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect}: ImagePro
       onClick={handleImageClick}
     >
       {/* debug */}
-      <div className="absolute top-0 left-0 p-4 text-white bg-black bg-opacity-50">
-        <p>X: {Math.floor(imagePos.x.get())}, Y: {Math.floor(imagePos.y.get())}</p>
-        <p>Dragging: {image.dragging ? 'true' : 'false'}</p>
-        <p>Selected: {image.selected ? 'true' : 'false'}</p>
-        <p>ZIndex: {image.zIndex}</p>
-      </div>
+      {showDebug && (
+        <div className="absolute top-0 left-0 p-4 text-white bg-black bg-opacity-50 select-none">
+          <p>X: {Math.floor(imagePos.x.get())}, Y: {Math.floor(imagePos.y.get())}</p>
+          <p>Dragging: {image.dragging ? 'true' : 'false'}</p>
+          <p>Selected: {image.selected ? 'true' : 'false'}</p>
+          <p>ZIndex: {image.zIndex}</p>
+        </div>
+      )}
+
+      {image.selected && (
+        <div
+          {...resizeBind()}
+          className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-indigo-500 cursor-nwse-resize rounded-sm select-none touch-none"
+          onMouseDown={handleMouseDown}
+        ></div>
+      )}
       
       <img 
         src={image.src} 
-        draggable={false} 
+        draggable={false}
+        style={{
+          width: `${image.width * image.scale}px`,
+          height: `${image.height * image.scale}px`,
+          cursor: image.selected ? 'move' : 'default',
+          border: image.selected ? '2px solid black' : 'none',
+          userSelect: 'none',
+        }}
         className="object-cover shadow-lg"
         alt="image"
       />
