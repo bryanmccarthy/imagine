@@ -23,9 +23,10 @@ type Image = {
 function App() {
   const [images, setImages] = useState<Image[]>([])
   const [{ panX, panY }, api] = useSpring(() => ({ panX: 0, panY: 0 }))
-  const mousePosition = useMousePosition() || {x: 0, y: 0}
+  const mousePosition = useMousePosition()
   const maxZIndex = useRef(1)
   const minZIndex = useRef(-1)
+  const [cursorGrabStyle, setCursorGrabStyle] = useState('cursor-grab')
 
   const moveToFront = (id: string) => {
     setImages((prevImages) => {
@@ -49,6 +50,14 @@ function App() {
       })
       return updatedImages
     })
+  }
+
+  const unselectAllImages = () => {
+    setImages((prevImages) => prevImages.map((image) => ({...image, selected: false})))
+  }
+
+  const deleteAllImages = () => {
+    setImages([])
   }
 
   const onDrop = useCallback((acceptedFiles: any) => {
@@ -104,14 +113,19 @@ function App() {
     }
   }, [])
 
+  // Panning gesture
   const bind = useGesture(
     {
       onDrag: ({offset: [dx, dy]}) => {
+        setCursorGrabStyle('cursor-grabbing')
         // Prevent panning when an image is being dragged
         for (let i = 0; i < images.length; i++) {
           if (images[i].dragging) return
         }
         api.start({ panX: dx, panY: dy })
+      },
+      onDragEnd: () => {
+        setCursorGrabStyle('cursor-grab')
       },
     },
   )
@@ -183,7 +197,7 @@ function App() {
 
   return (
     <>
-      <div className="App flex h-[calc(100dvh)]" style={{touchAction: 'none'}} {...getRootProps()} {...bind()}>
+      <div className={`App flex h-[calc(100dvh)] ${cursorGrabStyle}`} style={{touchAction: 'none'}} {...getRootProps()} {...bind()}>
         <input {...getInputProps()} />
 
         {/* debug */}
@@ -218,7 +232,7 @@ function App() {
         {images.filter(image => image.selected).map((image) => (
           <div key={image.id}>
             <button
-              className="absolute flex justify-center items-center cursor-pointer -left-11 w-10 h-10 text-white rounded bg-indigo-500 bg-opacity-70"
+              className="absolute flex justify-center items-center cursor-pointer w-10 h-10 text-white rounded bg-indigo-800 bg-opacity-70"
               style={{
                 left: `${image.x - 42}px`,
                 top: `${image.y}px`,
@@ -233,7 +247,7 @@ function App() {
               <ArrowUpOnSquare />
             </button>
             <button
-              className="absolute flex justify-center items-center cursor-pointer -left-11 w-10 h-10 text-white rounded bg-indigo-500 bg-opacity-70"
+              className="absolute flex justify-center items-center cursor-pointer w-10 h-10 text-white rounded bg-indigo-800 bg-opacity-70"
               style={{
                 left: `${image.x - 42}px`,
                 top: `${image.y + 42}px`,
@@ -247,8 +261,9 @@ function App() {
               >
               <ArrowDownOnSquare />
             </button>
+            {/* Border */}
             <div
-              className="absolute border-2 border-indigo-500 opacity-60 pointer-events-none select-none"
+              className="absolute border-2 border-indigo-800 opacity-70 pointer-events-none select-none"
               style={{
                 left: `${image.x}px`,
                 top: `${image.y}px`,
@@ -260,7 +275,15 @@ function App() {
           </div>
         ))}
         </animated.div>
-
+        {/* Side Controls */}
+        <div className="absolute top-0 right-0 flex flex-col p-2 gap-2">
+          <button className="flex justify-center items-center w-10 h-10 text-white bg-indigo-800 opacity-70 rounded" onClick={() => unselectAllImages()}>
+            <HandRaised />
+          </button>
+          <button className="flex justify-center items-center w-10 h-10 text-white bg-indigo-800 opacity-70 rounded" onClick={() => deleteAllImages()}>
+            <ArchiveBox /> 
+          </button>
+        </div>
       </div>
     </>
   )
@@ -339,7 +362,7 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}
       {image.selected && (
         <div
           {...resizeBind()}
-          className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-indigo-500 cursor-nwse-resize rounded-sm select-none touch-none"
+          className="absolute -bottom-0.5 -right-0.5 w-2 h-2 bg-indigo-600 cursor-nwse-resize rounded-sm select-none touch-none"
           onMouseDown={handleMouseDown}
         ></div>
       )}
@@ -351,7 +374,6 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}
           width: `${image.width * image.scale}px`,
           height: `${image.height * image.scale}px`,
           cursor: image.selected ? 'move' : 'default',
-          border: image.selected ? '2px solid black' : 'none',
           userSelect: 'none',
         }}
         className="object-cover shadow-lg"
@@ -394,6 +416,22 @@ const ArrowDownOnSquare = () => {
   return (
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
       <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 0 0 4.5 9.75v7.5a2.25 2.25 0 0 0 2.25 2.25h7.5a2.25 2.25 0 0 0 2.25-2.25v-7.5a2.25 2.25 0 0 0-2.25-2.25h-.75m-6 3.75 3 3m0 0 3-3m-3 3V1.5m6 9h.75a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25h-7.5a2.25 2.25 0 0 1-2.25-2.25v-.75" />
+    </svg>
+  )
+}
+
+const HandRaised = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M10.05 4.575a1.575 1.575 0 1 0-3.15 0v3m3.15-3v-1.5a1.575 1.575 0 0 1 3.15 0v1.5m-3.15 0 .075 5.925m3.075.75V4.575m0 0a1.575 1.575 0 0 1 3.15 0V15M6.9 7.575a1.575 1.575 0 1 0-3.15 0v8.175a6.75 6.75 0 0 0 6.75 6.75h2.018a5.25 5.25 0 0 0 3.712-1.538l1.732-1.732a5.25 5.25 0 0 0 1.538-3.712l.003-2.024a.668.668 0 0 1 .198-.471 1.575 1.575 0 1 0-2.228-2.228 3.818 3.818 0 0 0-1.12 2.687M6.9 7.575V12m6.27 4.318A4.49 4.49 0 0 1 16.35 15m.002 0h-.002" />
+    </svg>
+  )
+}
+
+const ArchiveBox = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m6 4.125 2.25 2.25m0 0 2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" />
     </svg>
   )
 }
