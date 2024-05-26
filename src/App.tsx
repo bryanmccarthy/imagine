@@ -3,8 +3,9 @@ import {useDropzone} from 'react-dropzone'
 import {useGesture} from '@use-gesture/react'
 import {useSpring, animated} from '@react-spring/web'
 import { v4 as uuidv4 } from 'uuid'
+import './App.css'
 
-const showDebug = true
+const showDebug = false 
 
 type Image = {
   id: string
@@ -21,7 +22,7 @@ type Image = {
 
 function App() {
   const [images, setImages] = useState<Image[]>([])
-  const [{ x, y }, api] = useSpring(() => ({ x: 0, y: 0 }))
+  const [{ panX, panY }, api] = useSpring(() => ({ panX: 0, panY: 0 }))
   const mousePosition = useMousePosition() || {x: 0, y: 0}
   const maxZIndex = useRef(1)
   const minZIndex = useRef(-1)
@@ -61,18 +62,19 @@ function App() {
       img.src = reader.result as string
 
       img.onload = () => {
+
         let initialX = 0
-        if (x.get() < 0) {
-          initialX = 0 + Math.abs(x.get())
-        } else if (x.get() > 0) {
-          initialX = 0 - x.get()
+        if (panX.get() < 0) {
+          initialX = 0 + Math.abs(panX.get())
+        } else if (panX.get() > 0) {
+          initialX = 0 - panX.get()
         }
 
         let initialY = 0
-        if (y.get() < 0) {
-          initialY = 0 + Math.abs(y.get())
-        } else if (y.get() > 0) {
-          initialY = 0 - y.get()
+        if (panY.get() < 0) {
+          initialY = 0 + Math.abs(panY.get())
+        } else if (panY.get() > 0) {
+          initialY = 0 - panY.get()
         }
 
         let initalScale = 1
@@ -109,7 +111,7 @@ function App() {
         for (let i = 0; i < images.length; i++) {
           if (images[i].dragging) return
         }
-        api.start({ x: dx, y: dy })
+        api.start({ panX: dx, panY: dy })
       },
     },
   )
@@ -117,8 +119,6 @@ function App() {
   const {getRootProps, getInputProps} = useDropzone({onDrop, noClick: true, noKeyboard: true})
 
   const handleImageDrag = (id: string, x: number, y: number) => {
-    console.log('dragging: ', x, y)
-
     setImages((prevImages) => {
       const updatedImages = prevImages.map((image) => {
         if (image.id === id) {
@@ -183,25 +183,24 @@ function App() {
 
   return (
     <>
-      <div className="flex h-[calc(100dvh)] bg-orange-100" style={{touchAction: 'none'}} {...getRootProps()} {...bind()}>
+      <div className="App flex h-[calc(100dvh)]" style={{touchAction: 'none'}} {...getRootProps()} {...bind()}>
         <input {...getInputProps()} />
 
         {/* debug */}
         {showDebug && (
-          <div className="absolute z-10 top-0 left-0 p-4 text-white bg-black bg-opacity-50">
+          <div className="absolute z-10 top-0 right-0 p-4 text-white bg-black bg-opacity-50">
             <p>MouseX: {mousePosition.x}, MouseY: {mousePosition.y}</p>
-            <p>PanX: {Math.floor(x.get())}, PanY:{Math.floor(y.get())}</p>
+            <p>PanX: {Math.floor(panX.get())}, PanY:{Math.floor(panY.get())}</p>
           </div>
         )}
         
         <animated.div
           style={{
-            x: x,
-            y: y,
+            x: panX,
+            y: panY,
             width: '100%',
             height: '100%',
             position: 'relative',
-            border: '2px dashed black',
             userSelect: 'none',
           }}
         >
@@ -276,7 +275,6 @@ type ImagePropsTypes = {
 }
 
 function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}: ImagePropsTypes) {
-  const imagePos = useSpring({x: image.x, y: image.y})
   const [size, setSize] = useState({ width: image.width * image.scale, height: image.height * image.scale })
 
   const handleImageClick = (e: any) => {
@@ -288,8 +286,6 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}
     {
       onDrag: ({offset: [x, y], event}) => {
         event.stopPropagation()
-        imagePos.x.set(x)
-        imagePos.y.set(y)
         onImageDrag(x, y)
         onSelect()
       },
@@ -323,8 +319,8 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}
       {...bind()} 
       className="absolute"
       style={{
-        x: imagePos.x, 
-        y: imagePos.y,
+        x: image.x,
+        y: image.y,
         touchAction: 'none',
         zIndex: image.zIndex,
       }}
@@ -333,7 +329,7 @@ function ImageComponent({image, onImageDrag, onImageDragEnd, onSelect, onResize}
       {/* debug */}
       {showDebug && (
         <div className="absolute top-0 left-0 p-4 text-white bg-black bg-opacity-50 select-none">
-          <p>X: {Math.floor(imagePos.x.get())}, Y: {Math.floor(imagePos.y.get())}</p>
+          <p>X: {Math.floor(image.x)}, Y: {Math.floor(image.y)}</p>
           <p>Dragging: {image.dragging ? 'true' : 'false'}</p>
           <p>Selected: {image.selected ? 'true' : 'false'}</p>
           <p>ZIndex: {image.zIndex}</p>

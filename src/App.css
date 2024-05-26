@@ -1,0 +1,10 @@
+.App {
+    --dot-bg: #a9a0a6;
+    --dot-color: #140051;
+    --dot-size: 2px;
+    --dot-space: 50px;
+    background:
+      linear-gradient(90deg, var(--dot-bg) calc(var(--dot-space) - var(--dot-size)), transparent 1%) center / var(--dot-space) var(--dot-space),
+      linear-gradient(var(--dot-bg) calc(var(--dot-space) - var(--dot-size)), transparent 1%) center / var(--dot-space) var(--dot-space),
+      var(--dot-color);
+  }
