@@ -4,7 +4,7 @@ import {useGesture} from '@use-gesture/react'
 import {useSpring, animated} from '@react-spring/web'
 import { v4 as uuidv4 } from 'uuid'
 
-const showDebug = false
+const showDebug = true
 
 type Image = {
   id: string
@@ -24,13 +24,25 @@ function App() {
   const [{ x, y }, api] = useSpring(() => ({ x: 0, y: 0 }))
   const mousePosition = useMousePosition() || {x: 0, y: 0}
   const maxZIndex = useRef(1)
+  const minZIndex = useRef(-1)
 
   const moveToFront = (id: string) => {
-    console.log('moveToFront')
     setImages((prevImages) => {
       const updatedImages = prevImages.map((image) => {
         if (image.id === id) {
           return {...image, zIndex: maxZIndex.current++}
+        }
+        return image
+      })
+      return updatedImages
+    })
+  }
+
+  const moveToBack = (id: string) => {
+    setImages((prevImages) => {
+      const updatedImages = prevImages.map((image) => {
+        if (image.id === id) {
+          return {...image, zIndex: minZIndex.current--}
         }
         return image
       })
@@ -49,12 +61,6 @@ function App() {
       img.src = reader.result as string
 
       img.onload = () => {
-        console.log({
-          width: img.width,
-          height: img.height,
-          aspectRatio: img.width / img.height
-        })
-
         let initialX = 0
         if (x.get() < 0) {
           initialX = 0 + Math.abs(x.get())
@@ -111,6 +117,8 @@ function App() {
   const {getRootProps, getInputProps} = useDropzone({onDrop, noClick: true, noKeyboard: true})
 
   const handleImageDrag = (id: string, x: number, y: number) => {
+    console.log('dragging: ', x, y)
+
     setImages((prevImages) => {
       const updatedImages = prevImages.map((image) => {
         if (image.id === id) {
@@ -219,12 +227,26 @@ function App() {
                 userSelect: 'none',
               }}
               onClick={(e) => {
-                console.log('moveToFront')
                 e.stopPropagation()
                 moveToFront(image.id)
               }}
               >
               <ArrowUpOnSquare />
+            </button>
+            <button
+              className="absolute flex justify-center items-center cursor-pointer -left-11 w-10 h-10 text-white rounded bg-indigo-500 bg-opacity-70"
+              style={{
+                left: `${image.x - 42}px`,
+                top: `${image.y + 42}px`,
+                zIndex: maxZIndex.current + 1,
+                userSelect: 'none',
+              }}
+              onClick={(e) => {
+                e.stopPropagation()
+                moveToBack(image.id)
+              }}
+              >
+              <ArrowDownOnSquare />
             </button>
             <div
               className="absolute border-2 border-indigo-500 opacity-60 pointer-events-none select-none"
@@ -372,5 +394,12 @@ const ArrowUpOnSquare = () => {
   )
 }
 
+const ArrowDownOnSquare = () => {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-6">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 7.5h-.75A2.25 2.25 0 0 0 4.5 9.75v7.5a2.25 2.25 0 0 0 2.25 2.25h7.5a2.25 2.25 0 0 0 2.25-2.25v-7.5a2.25 2.25 0 0 0-2.25-2.25h-.75m-6 3.75 3 3m0 0 3-3m-3 3V1.5m6 9h.75a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25h-7.5a2.25 2.25 0 0 1-2.25-2.25v-.75" />
+    </svg>
+  )
+}
 
 export default App
